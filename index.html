@@ -111,7 +111,7 @@ function dl(n,x,m){const a=document.createElement('a');a.href=URL.createObjectUR
 $('#csv').onclick=()=>dl('attendance-'+$('#sm').value+'.csv','\ufeffالطالب,المجموعة,حضر,من,نسبة\n'+(window._rows||[]).map(r=>[`"${r.s.n}"`,r.s.g,r.att,r.tot,r.p===null?'':r.p].join(',')).join('\n'),'text/csv');
 $('#bx').onclick=()=>dl('attendance-backup-'+new Date().toISOString().slice(0,10)+'.json',JSON.stringify({sessions:allSessions(),extra:Object.values(R.extra)}),'application/json');
 $('#ri').onclick=()=>$('#rf').click();
-$('#rf').onchange=async e=>{try{const j=JSON.parse(await e.target.files[0].text());let n=0;Object.entries(j).forEach(([g,a])=>{FB.put('roster',g,{students:a});n+=a.length});alert('تم رفع قائمة '+n+' طالب')}catch(x){alert('الملف غير صالح')}e.target.value=''};
+$('#rf').onchange=async e=>{try{const j=JSON.parse(await e.target.files[0].text());let n=0;Object.entries(j).forEach(([g,a])=>{FB.put('roster',g,{students:a.map(s=>({i:s[0],n:s[1]}))});n+=a.length});alert('تم رفع قائمة '+n+' طالب')}catch(x){alert('الملف غير صالح')}e.target.value=''};
 $('#bi').onclick=()=>$('#bf').click();
 $('#bf').onchange=async e=>{try{const j=JSON.parse(await e.target.files[0].text());let n=0;Object.values(j.sessions||{}).forEach(s=>{const o=allSessions()[s.id];if(!o||(s.at||0)>(o.at||0)){FB.put('sessions',s.id,s);n++}});(j.extra||[]).forEach(s=>{if(!R.extra[s.id])FB.put('students',s.id,s)});alert('تم استيراد '+n+' تحضير')}catch(x){alert('الملف غير صالح')}e.target.value=''};
 function dayView(){const d=$('#dd').value,S=Object.values(allSessions()).filter(s=>s.date===d),by={};allStudents().forEach(s=>by[s.id]=s);let done=0,p=0,a=0;
@@ -131,7 +131,7 @@ function sync(){status()}
 let unsub=[];
 function dayRefresh(){fillMods();render();if(!$('#day').classList.contains('hide'))dayView();if(!$('#log').classList.contains('hide'))logView();status()}
 FB.onUser(u=>{$('#login').classList.toggle('hide',!!u);unsub.forEach(f=>f&&f());unsub=[];
- if(u){unsub.push(FB.watch('sessions',(m,p)=>{R.sessions=m;R.pending=p;lastPull=Date.now();dayRefresh()}));unsub.push(FB.watch('students',(m)=>{R.extra=m;dayRefresh()}));unsub.push(FB.watch('roster',(m)=>{ST=[];Object.entries(m).forEach(([g,d])=>(d.students||[]).forEach(s=>ST.push([g,s[0],s[1]])));dayRefresh()}))}else{R.sessions={};R.extra={};R.pending={}}});
+ if(u){unsub.push(FB.watch('sessions',(m,p)=>{R.sessions=m;R.pending=p;lastPull=Date.now();dayRefresh()}));unsub.push(FB.watch('students',(m)=>{R.extra=m;dayRefresh()}));unsub.push(FB.watch('roster',(m)=>{ST=[];Object.entries(m).forEach(([g,d])=>(d.students||[]).forEach(s=>ST.push(Array.isArray(s)?[g,s[0],s[1]]:[g,s.i,s.n])));dayRefresh()}))}else{R.sessions={};R.extra={};R.pending={}}});
 $('#lgo').onclick=async()=>{$('#lerr').textContent='';try{await FB.login($('#le').value.trim(),$('#lp').value)}catch(e){$('#lerr').textContent=navigator.onLine?'الإيميل أو كلمة المرور غير صحيحة':'محتاج إنترنت لأول دخول'}};
 $('#lout').onclick=()=>{if(confirm('تسجيل الخروج؟'))FB.logout()};
 window.addEventListener('offline',status);
