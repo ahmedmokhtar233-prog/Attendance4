@@ -27,7 +27,7 @@ button.sm{padding:7px 12px;border:1px solid var(--line);border-radius:8px;backgr
 .sum{position:sticky;bottom:0;background:var(--card);border-top:1px solid var(--line);padding:8px 12px;display:flex;justify-content:space-between;font-weight:600}
 .scroll{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:7px 6px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
 .pct{font-weight:700}.low{color:var(--bad)}.hide{display:none}.res{max-height:180px;overflow:auto}
-.tag{font-size:12px;color:var(--late)}
+.tag{font-size:12px;color:var(--late)}.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}.chip{padding:10px 14px;border:1px solid var(--line);border-radius:20px;background:var(--bg);color:var(--ink);font:inherit;touch-action:manipulation}.chip.on{background:var(--pri);color:var(--priInk);border-color:var(--pri);font-weight:700}
 </style></head><body>
 <div id="login" style="position:fixed;inset:0;background:var(--bg);z-index:50;padding:24px;overflow:auto"><div class="card" style="max-width:380px;margin:12vh auto 0"><h2 style="margin-top:0">تسجيل الدخول</h2><label>الإيميل</label><input id="le" type="email" autocomplete="username" dir="ltr"><label style="margin-top:8px">كلمة المرور</label><input id="lp" type="password" autocomplete="current-password" dir="ltr"><div id="lerr" class="tag" style="margin-top:6px"></div><button class="pri" id="lgo">دخول</button><small style="color:var(--mut)">أول دخول يحتاج إنترنت، وبعدها يفضل الحساب شغال أوفلاين.</small></div></div>
 <header><b>غياب الفرقة الرابعة</b><span><span id="sync"></span> <button class="sm" id="lout" style="padding:3px 8px">خروج</button></span></header>
@@ -36,10 +36,10 @@ button.sm{padding:7px 12px;border:1px solid var(--line);border-radius:8px;backgr
 <section id="take">
  <div class="card"><div class="grid">
   <div><label>اسم الدكتور</label><input id="doc" placeholder="الاسم"></div>
-  <div><label>الموديول</label><input id="mod" list="mods" placeholder="GIT"><datalist id="mods"></datalist></div>
+  <div><label>موديول آخر (اختياري)</label><input id="mod" placeholder="اكتب الاسم"></div>
   <div><label>النوع</label><select id="typ"><option>راوند</option><option>محاضرة</option></select></div>
   <div><label>التاريخ</label><input id="dt" type="date"></div>
- </div><div style="margin-top:8px"><label>المجموعة</label><select id="grp"></select></div></div>
+ </div><div style="margin-top:10px"><label>الموديول (اضغط للاختيار)</label><div id="chips" class="chips"></div></div><div style="margin-top:10px"><label>المجموعة</label><select id="grp"></select></div></div>
  <div class="card"><div id="list"></div></div>
  <div class="card"><label>طالب من مجموعة تانية حضر معاك</label><input id="q" placeholder="ابحث بالاسم أو الكود"><div id="res" class="res"></div>
   <button class="sm" id="addBtn" style="margin-top:8px">+ إضافة طالب جديد للمجموعة</button>
@@ -86,13 +86,17 @@ $('#q').oninput=()=>{const q=$('#q').value.trim();if(q.length<2){$('#res').inner
  const g=$('#grp').value;$('#res').innerHTML=allStudents().filter(s=>s.g!==g&&(s.n.includes(q)||String(s.id).includes(q))).slice(0,15).map(s=>`<div class="row" data-a="${esc(s.id)}"><span class="n">${esc(s.n)}</span><small>${s.g}</small></div>`).join('')};
 $('#res').onclick=e=>{const r=e.target.closest('[data-a]');if(!r)return;const i=r.dataset.a;if(!cur.extra.includes(i))cur.extra.push(i);cur.marks[i]='P';$('#q').value='';$('#res').innerHTML='';render()};
 $('#addBtn').onclick=()=>$('#addBox').classList.toggle('hide');
-$('#aok').onclick=()=>{const n=$('#an').value.trim();if(!n)return alert('اكتب اسم الطالب');const s={id:$('#ac').value.trim()||'x'+Date.now(),n,g:$('#grp').value};FB.put('students',s.id,s);$('#an').value=$('#ac').value='';$('#addBox').classList.add('hide');sync();render()};
+$('#aok').onclick=()=>{const n=$('#an').value.trim();if(!n)return alert('اكتب اسم الطالب');const s={id:$('#ac').value.trim()||'x'+Date.now(),n,g:$('#grp').value};FB.put('students',s.id,s);track();$('#an').value=$('#ac').value='';$('#addBox').classList.add('hide');sync();render()};
 $('#save').onclick=()=>{const doc=$('#doc').value.trim(),mod=$('#mod').value.trim();if(!doc||!mod)return alert('اكتب اسم الدكتور والموديول');
  const g=$('#grp').value,marks={};allStudents().filter(s=>s.g===g).forEach(s=>marks[s.id]=cur.marks[s.id]||'P');cur.extra.forEach(i=>marks[i]=cur.marks[i]);
- L.doctor=doc;persist();FB.put('sessions',cur.id,{id:cur.id,doctor:doc,module:mod,type:$('#typ').value,date:$('#dt').value,group:g,marks,by:FB.email(),at:Date.now()});
+ L.doctor=doc;persist();FB.put('sessions',cur.id,{id:cur.id,doctor:doc,module:mod,type:$('#typ').value,date:$('#dt').value,group:g,marks,by:FB.email(),at:Date.now()});track();
  newSession();render();status();sync();fillMods();alert('تم الحفظ، وهيترفع تلقائيًا لما يبقى فيه نت')};
-function fillMods(){const m=[...new Set(Object.values(allSessions()).map(s=>s.module))];
- $('#mods').innerHTML=['GIT','Nephrology','Cardiology','Chest','Endocrinology','Hematology','Rheumatology','Neurology'].concat(m).map(x=>`<option>${esc(x)}</option>`).join('');
+const BASE_MODS=['GIT','Nephrology','Cardiology','Chest','Endocrinology','Hematology','Rheumatology','Neurology'];
+function chips(){const c=$('#mod').value.trim(),m=Object.values(allSessions()).map(s=>s.module),all=[...new Set(BASE_MODS.concat(m))];
+ $('#chips').innerHTML=all.map(x=>`<button type="button" class="chip${x===c?' on':''}" data-m="${esc(x)}">${esc(x)}</button>`).join('')}
+$('#chips').onclick=e=>{const b=e.target.closest('[data-m]');if(!b)return;$('#mod').value=b.dataset.m;chips()};
+$('#mod').oninput=chips;
+function fillMods(){const m=[...new Set(Object.values(allSessions()).map(s=>s.module))];chips();
  const o=$('#sm').value;$('#sm').innerHTML=m.map(x=>`<option>${esc(x)}</option>`).join('');if(m.includes(o))$('#sm').value=o;
  $('#sg').innerHTML='<option value="">كل المجموعات</option>'+groups.map(g=>`<option>${g}</option>`).join('')}
 function logView(){const a=Object.values(allSessions()).sort((x,y)=>(y.date||'').localeCompare(x.date||'')||y.at-x.at);
@@ -100,7 +104,7 @@ function logView(){const a=Object.values(allSessions()).sort((x,y)=>(y.date||'')
 $('#logl').onclick=e=>{const x=e.target.closest('[data-d]');if(x){const id=x.dataset.d,s=allSessions()[id];if(!s||!confirm('حذف تحضير '+s.module+' - '+s.group+' بتاريخ '+s.date+'؟'))return;
  FB.del('sessions',id);delete R.sessions[id];if(cur.id===id)newSession();logView();render();return}
  const b=e.target.closest('[data-e]');if(!b)return;const s=allSessions()[b.dataset.e];cur={id:s.id,marks:Object.assign({},s.marks),extra:Object.keys(s.marks).filter(i=>!(ST.find(x=>x[1]==i&&x[0]===s.group)))};
- $('#doc').value=s.doctor;$('#mod').value=s.module;$('#typ').value=s.type;$('#dt').value=s.date;$('#grp').value=s.group;tab('take');render()};
+ $('#doc').value=s.doctor;$('#mod').value=s.module;chips();$('#typ').value=s.type;$('#dt').value=s.date;$('#grp').value=s.group;tab('take');render()};
 function stats(){const mod=$('#sm').value,g=$('#sg').value,S=Object.values(allSessions()).filter(s=>s.module===mod);
  const rows=allStudents().filter(s=>!g||s.g===g).map(s=>{const att=S.filter(x=>x.marks[s.id]&&x.marks[s.id]!=='A').length;
   const tot=Math.max(att,new Set(S.filter(x=>x.group===s.g).map(x=>x.date+x.type)).size);return{s,att,tot,p:tot?Math.round(att*100/tot):null}});
@@ -126,12 +130,21 @@ $('#dcsv').onclick=()=>{const d=$('#dd').value,by={};allStudents().forEach(s=>by
  dl('daily-'+d+'.csv','\ufeffالتاريخ,المجموعة,الموديول,النوع,الدكتور,الكود,الطالب,مجموعته الأصلية,الحالة\n'+rows.join('\n'),'text/csv')};
 function tab(t){document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));['take','log','stats','day'].forEach(x=>$('#'+x).classList.toggle('hide',x!==t));if(t==='log')logView();if(t==='day')dayView();if(t==='stats'){fillMods();stats()}}
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>tab(b.dataset.t));
-function status(){const n=Object.keys(R.pending).filter(k=>R.pending[k]).length;$('#sync').textContent=(navigator.onLine?'متصل':'أوفلاين')+(n?' · '+n+' لم يُرفع':' · الكل مرفوع')}
+let admin=false,unsub=[];
+function status(){const n=Object.keys(R.pending).filter(k=>R.pending[k]).length;$('#sync').textContent=(navigator.onLine?'متصل':'أوفلاين')+(admin?(n?' · '+n+' لم يُرفع':' · الكل مرفوع'):(L.pend?' · في انتظار الرفع':' · الكل مرفوع'))}
 function sync(){status()}
-let unsub=[];
-function dayRefresh(){fillMods();render();if(!$('#day').classList.contains('hide'))dayView();if(!$('#log').classList.contains('hide'))logView();status()}
-FB.onUser(u=>{$('#login').classList.toggle('hide',!!u);unsub.forEach(f=>f&&f());unsub=[];
- if(u){unsub.push(FB.watch('sessions',(m,p)=>{R.sessions=m;R.pending=p;lastPull=Date.now();dayRefresh()}));unsub.push(FB.watch('students',(m)=>{R.extra=m;dayRefresh()}));unsub.push(FB.watch('roster',(m)=>{ST=[];Object.entries(m).forEach(([g,d])=>(d.students||[]).forEach(s=>ST.push(Array.isArray(s)?[g,s[0],s[1]]:[g,s.i,s.n])));dayRefresh()}))}else{R.sessions={};R.extra={};R.pending={}}});
+function track(){L.pend=true;persist();status();FB.synced().then(()=>{L.pend=false;persist();status()})}
+function dayRefresh(){fillMods();render();if(admin){if(!$('#day').classList.contains('hide'))dayView();if(!$('#log').classList.contains('hide'))logView()}status()}
+function applyRole(a){admin=a;$('nav').classList.toggle('hide',!a);if(!a)tab('take');unsub.forEach(f=>f&&f());unsub=[];
+ if(a)unsub.push(FB.watch('sessions',(m,p)=>{R.sessions=m;R.pending=p;lastPull=Date.now();dayRefresh()}));
+ unsub.push(FB.watch('students',m=>{R.extra=m;dayRefresh()}));
+ unsub.push(FB.watch('roster',m=>{ST=[];Object.entries(m).forEach(([g,d])=>(d.students||[]).forEach(s=>ST.push(Array.isArray(s)?[g,s[0],s[1]]:[g,s.i,s.n])));dayRefresh()}));status()}
+FB.onUser(async u=>{$('#login').classList.toggle('hide',!!u);unsub.forEach(f=>f&&f());unsub=[];
+ if(!u){R.sessions={};R.extra={};R.pending={};ST=[];admin=false;return}
+ const k='role_'+u.uid;let a=null;try{a=localStorage.getItem(k)}catch(e){}
+ applyRole(a==='1');const r=await FB.probe();
+ if(r!==null){try{localStorage.setItem(k,r?'1':'0')}catch(e){}if(r!==(a==='1'))applyRole(r)}
+ if(L.pend)track()});
 $('#lgo').onclick=async()=>{$('#lerr').textContent='';try{await FB.login($('#le').value.trim(),$('#lp').value)}catch(e){$('#lerr').textContent=navigator.onLine?'الإيميل أو كلمة المرور غير صحيحة':'محتاج إنترنت لأول دخول'}};
 $('#lout').onclick=()=>{if(confirm('تسجيل الخروج؟'))FB.logout()};
 window.addEventListener('offline',status);
