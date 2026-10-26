@@ -35,6 +35,7 @@ button.sm{padding:7px 12px;border:1px solid var(--line);border-radius:8px;backgr
 <nav><button data-t="take" class="on">تحضير</button><button data-t="log">السجل</button><button data-t="day">اليوم</button><button data-t="stats">الإحصائيات</button></nav>
 <main>
 <section id="take">
+ <div id="mine"></div>
  <div class="card"><div class="grid">
   <div><label>اسم الدكتور</label><input id="doc" placeholder="الاسم"></div>
   <div><label>موديول آخر (اختياري)</label><input id="mod" placeholder="اكتب الاسم"></div>
@@ -47,21 +48,24 @@ button.sm{padding:7px 12px;border:1px solid var(--line);border-radius:8px;backgr
   <div id="addBox" class="hide" style="margin-top:8px"><input id="an" placeholder="اسم الطالب"><input id="ac" placeholder="الكود (اختياري)" style="margin-top:6px"><button class="pri" id="aok">حفظ الطالب</button></div></div>
  <div class="sum"><span id="cnt"></span><span id="edit"></span></div>
  <button class="pri" id="save">حفظ التحضير</button>
+ <button class="sm hide" id="cedit" style="width:100%;margin-top:8px">إلغاء التعديل</button>
 </section>
 <section id="log" class="hide"><div class="card" style="display:flex;gap:8px"><button class="sm" id="bx">نسخة احتياطية</button><button class="sm" id="bi">استيراد نسخة</button><button class="sm" id="ri">استيراد قائمة الطلاب</button><input type="file" id="rf" accept=".json" class="hide"><input type="file" id="bf" accept=".json" class="hide"></div><div id="blk"></div><div id="logl"></div></section>
-<section id="day" class="hide"><div class="card"><label>التاريخ</label><input id="dd" type="date"><div id="dsum" style="margin-top:8px;font-weight:600"></div><small id="dsync" class="tag"></small><br><button class="sm" id="dcsv" style="margin-top:8px">تصدير تقرير اليوم CSV</button></div><div id="dl"></div></section>
+<section id="day" class="hide"><div class="card"><label>التاريخ</label><input id="dd" type="date"><div id="dsum" style="margin-top:8px;font-weight:600"></div><small id="dsync" class="tag"></small><br><div style="margin-top:8px"><label>تصدير لفترة: إلى تاريخ (اتركه فاضي لتصدير اليوم المختار فقط)</label><input id="dd2" type="date"></div><div style="margin-top:8px"><label>محتوى ملف التصدير</label><select id="dflt"><option value="">الحضور والغياب</option><option value="p">الحضور فقط</option><option value="a">الغياب فقط</option></select></div><button class="sm" id="dcsv" style="margin-top:8px">تصدير تقرير اليوم CSV</button></div><div id="dl"></div></section>
 <section id="stats" class="hide">
  <div class="card"><div class="grid"><div><label>الموديول</label><select id="sm"></select></div><div><label>المجموعة</label><select id="sg"></select></div></div>
-  <button class="sm" id="csv" style="margin-top:8px">تصدير CSV</button></div>
+  <div class="grid" style="margin-top:8px"><div><label>نوع الجلسة</label><select id="stt"><option value="r">راوند</option><option value="l">محاضرة</option><option value="a">الكل</option></select></div><div><label>إجمالي الجلسات للموديول</label><div style="display:flex;gap:6px"><input id="tr" type="number" min="0" placeholder="روندات"><input id="tl" type="number" min="0" placeholder="محاضرات"></div></div></div>
+  <button class="sm" id="tsv" style="margin-top:8px">حفظ الإجمالي</button> <button class="sm" id="csv" style="margin-top:8px">تصدير CSV</button><div><small id="thint" class="tag"></small></div></div>
  <div class="card scroll"><table><thead><tr><th>الطالب</th><th>المجموعة</th><th>حضر</th><th>من</th><th>%</th></tr></thead><tbody id="sb"></tbody></table></div>
 </section>
 </main>
 <script src="fb.js"></script>
 <script>
-let ST=[],RO={};
+let ST=[],RO={},SET=[];
 const $=s=>document.querySelector(s),LS='att_v1';
 let lastPull=0;let L={doctor:'',sessions:{},extra:[],del:[]},R={sessions:{},extra:{},pending:{}},cur=null;
 try{L=Object.assign(L,JSON.parse(localStorage.getItem(LS)||'{}'))}catch(e){}
+L.mine=L.mine||{};
 const persist=()=>{try{localStorage.setItem(LS,JSON.stringify(L))}catch(e){}};
 const today=()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)};
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -82,7 +86,7 @@ function render(){
  $('#list').innerHTML=!ST.length?'<small>لا توجد قائمة طلاب بعد. من تبويب السجل اضغط "استيراد قائمة الطلاب" واختار roster.json.</small>':(ids.map(i=>{const s=by[i];if(!s)return'';return`<div class="row" data-i="${esc(i)}"><span class="n">${esc(s.n)}${s.g!==g?` <small class="tag">من ${esc(s.g)}</small>`:''}</span><span class="st ${cur.marks[i]}">${lab[cur.marks[i]]}</span></div>`}).join('')+blk.map(s=>`<div class="row blk"><span class="n">${esc(s.n)}</span><span class="st X">محجوب من الغياب</span></div>`).join('')||'<small>لا يوجد طلاب</small>');
  const ks=ids.map(i=>cur.marks[i]);
  $('#cnt').textContent=`حاضر ${ks.filter(x=>x!=='A').length} · غايب ${ks.filter(x=>x==='A').length}`+(blk.length?` · محجوب ${blk.length}`:'');
- $('#edit').textContent=allSessions()[cur.id]?'تعديل تحضير محفوظ':'';
+ $('#edit').textContent=cur.orig?'تعديل تحضير محفوظ':'';
 }
 $('#list').onclick=e=>{const r=e.target.closest('.row');if(!r||r.classList.contains('blk')||!r.dataset.i)return;const i=r.dataset.i;cur.marks[i]=nxt[cur.marks[i]];render()};
 $('#grp').onchange=()=>{newSession();render()};
@@ -91,16 +95,30 @@ $('#q').oninput=()=>{const q=$('#q').value.trim();if(q.length<2){$('#res').inner
 $('#res').onclick=e=>{const r=e.target.closest('[data-a]');if(!r)return;const i=r.dataset.a;if(!cur.extra.includes(i))cur.extra.push(i);cur.marks[i]='P';$('#q').value='';$('#res').innerHTML='';render()};
 $('#addBtn').onclick=()=>$('#addBox').classList.toggle('hide');
 $('#aok').onclick=()=>{const n=$('#an').value.trim();if(!n)return alert('اكتب اسم الطالب');const s={id:$('#ac').value.trim()||'x'+Date.now(),n,g:$('#grp').value};FB.put('students',s.id,s);track();$('#an').value=$('#ac').value='';$('#addBox').classList.add('hide');sync();render()};
+const WIN=3*3600*1000;
+function lockEdit(on){$('#cedit').classList.toggle('hide',!on);$('#grp').disabled=on;
+ ['#doc','#mod','#typ','#dt'].forEach(k=>$(k).disabled=on&&!admin);$('#chips').style.pointerEvents=(on&&!admin)?'none':''}
+function openEdit(s){cur={id:s.id,marks:Object.assign({},s.marks),extra:Object.keys(s.marks).filter(i=>!allStudents().find(x=>String(x.id)===String(i)&&x.g===s.group)),orig:s};
+ $('#doc').value=s.doctor;$('#mod').value=s.module;chips();$('#typ').value=s.type;$('#dt').value=s.date;$('#grp').value=s.group;tab('take');lockEdit(true);render()}
+$('#cedit').onclick=()=>{newSession();lockEdit(false);render()};
 $('#save').onclick=()=>{const doc=$('#doc').value.trim(),mod=$('#mod').value.trim();if(!doc||!mod)return alert('اكتب اسم الدكتور والموديول');
+ const o=cur.orig,now=Date.now();
+ if(o&&!admin&&now-o.at>=WIN){alert('انتهت مدة التعديل (3 ساعات). اطلب من المدير تعديل التحضير.');newSession();lockEdit(false);render();mineView();return}
  const g=$('#grp').value,marks={};allStudents().filter(s=>s.g===g&&!s.b).forEach(s=>marks[s.id]=cur.marks[s.id]||'P');cur.extra.forEach(i=>marks[i]=cur.marks[i]);
- L.doctor=doc;persist();FB.put('sessions',cur.id,{id:cur.id,doctor:doc,module:mod,type:$('#typ').value,date:$('#dt').value,group:g,marks,by:FB.email(),at:Date.now()});track();
- newSession();render();status();sync();fillMods();alert('تم الحفظ، وهيترفع تلقائيًا لما يبقى فيه نت')};
+ const f={doctor:doc,module:mod,type:$('#typ').value,date:$('#dt').value,group:g,marks};
+ const ses=o?Object.assign({},o,f,{upd:now}):Object.assign({id:cur.id,by:FB.email(),at:now},f);
+ L.doctor=doc;if(ses.by===FB.email())L.mine[ses.id]=ses;persist();FB.put('sessions',ses.id,ses);track();
+ newSession();lockEdit(false);render();status();sync();fillMods();mineView();alert('تم الحفظ، وهيترفع تلقائيًا لما يبقى فيه نت')};
+function mineView(){const now=Date.now();Object.keys(L.mine).forEach(k=>{if(now-L.mine[k].at>86400000)delete L.mine[k]});persist();
+ const a=Object.values(L.mine).filter(s=>now-s.at<WIN).sort((x,y)=>y.at-x.at);
+ $('#mine').innerHTML=a.length?`<div class="card"><b>تحضيراتي (التعديل متاح 3 ساعات من أول حفظ)</b>`+a.map(s=>{const m=Math.max(0,Math.ceil((s.at+WIN-now)/60000));return`<div class="row" style="cursor:default"><span class="n">${esc(s.group)} · ${esc(s.module)} · ${esc(s.type)}<br><small>باقي ${Math.floor(m/60)}س ${m%60}د</small></span><button class="sm" data-me="${esc(s.id)}">تعديل</button></div>`}).join('')+'</div>':''}
+$('#mine').onclick=e=>{const b=e.target.closest('[data-me]');if(!b)return;const s=L.mine[b.dataset.me];if(!s)return;if(!admin&&Date.now()-s.at>=WIN)return alert('انتهت مدة التعديل (3 ساعات)');openEdit(s)};
 const BASE_MODS=['GIT','Nephrology','Cardiology','Chest','Endocrinology','Hematology','Rheumatology','Neurology'];
 function chips(){const c=$('#mod').value.trim(),m=Object.values(allSessions()).map(s=>s.module),all=[...new Set(BASE_MODS.concat(m))];
  $('#chips').innerHTML=all.map(x=>`<button type="button" class="chip${x===c?' on':''}" data-m="${esc(x)}">${esc(x)}</button>`).join('')}
 $('#chips').onclick=e=>{const b=e.target.closest('[data-m]');if(!b)return;$('#mod').value=b.dataset.m;chips()};
 $('#mod').oninput=chips;
-function fillMods(){setGroups();const m=[...new Set(Object.values(allSessions()).map(s=>s.module))];chips();
+function fillMods(){setGroups();const m=[...new Set(BASE_MODS.concat(Object.values(allSessions()).map(s=>s.module),SET.map(x=>x.m)))];chips();
  const o=$('#sm').value;$('#sm').innerHTML=m.map(x=>`<option>${esc(x)}</option>`).join('');if(m.includes(o))$('#sm').value=o;
  const og=$('#sg').value;$('#sg').innerHTML='<option value="">كل المجموعات</option>'+groups.map(g=>`<option>${esc(g)}</option>`).join('');if(groups.includes(og))$('#sg').value=og}
 function blkView(){const a=allStudents().filter(s=>s.b);$('#blk').innerHTML=a.length?`<div class="card"><b>محجوبون من الغياب (${a.length})</b><div style="margin-top:6px">${a.map(s=>`<div class="row" style="cursor:default"><span class="n">${esc(s.n)} <small>${esc(s.g)}</small></span><button class="sm" data-u="${esc(s.id)}">فك الحجب</button></div>`).join('')}</div></div>`:''}
@@ -111,14 +129,19 @@ function logView(){blkView();const a=Object.values(allSessions()).sort((x,y)=>(y
  $('#logl').innerHTML=a.map(s=>{const p=Object.values(s.marks).filter(x=>x!=='A').length;return`<div class="card"><b>${esc(s.module)}</b> · ${esc(s.type)} · ${s.group}<br><small>${s.date} — د. ${esc(s.doctor)} — حضر ${p} من ${Object.keys(s.marks).length}${R.pending[s.id]?' <span class="tag">لم يُرفع</span>':''}</small><div style="margin-top:6px;display:flex;gap:8px"><button class="sm" data-e="${s.id}">تعديل</button><button class="sm" data-d="${s.id}" style="color:var(--bad)">حذف</button></div></div>`}).join('')||'<div class="card">لا توجد تحضيرات بعد</div>'}
 $('#logl').onclick=e=>{const x=e.target.closest('[data-d]');if(x){const id=x.dataset.d,s=allSessions()[id];if(!s||!confirm('حذف تحضير '+s.module+' - '+s.group+' بتاريخ '+s.date+'؟'))return;
  FB.del('sessions',id);delete R.sessions[id];if(cur.id===id)newSession();logView();render();return}
- const b=e.target.closest('[data-e]');if(!b)return;const s=allSessions()[b.dataset.e];cur={id:s.id,marks:Object.assign({},s.marks),extra:Object.keys(s.marks).filter(i=>!(ST.find(x=>x[1]==i&&x[0]===s.group)))};
- $('#doc').value=s.doctor;$('#mod').value=s.module;chips();$('#typ').value=s.type;$('#dt').value=s.date;$('#grp').value=s.group;tab('take');render()};
-function stats(){const mod=$('#sm').value,g=$('#sg').value,S=Object.values(allSessions()).filter(s=>s.module===mod);
+ const b=e.target.closest('[data-e]');if(!b)return;const s=allSessions()[b.dataset.e];if(s)openEdit(s)};
+function cfgFill(){const c=SET.find(x=>x.m===$('#sm').value)||{};$('#tr').value=c.r||'';$('#tl').value=c.l||''}
+function stats(){const mod=$('#sm').value,g=$('#sg').value,ty=$('#stt').value,cfg=SET.find(x=>x.m===mod)||{},
+ want=ty==='r'?['راوند']:ty==='l'?['محاضرة']:['راوند','محاضرة'],S=Object.values(allSessions()).filter(s=>s.module===mod&&want.includes(s.type)),
+ T=ty==='r'?cfg.r:ty==='l'?cfg.l:(cfg.r&&cfg.l?cfg.r+cfg.l:0);
+ $('#thint').textContent=T?'':'لم تُحدَّد إجمالي الجلسات لهذا الموديول، فالنسبة مؤقتة ومحسوبة من الجلسات المسجلة لمجموعة كل طالب (قد تكون غير دقيقة مع تجميع المجموعات).';
  const rows=allStudents().filter(s=>!g||s.g===g).map(s=>{if(s.b)return{s,att:0,tot:0,p:null,blk:true};const att=S.filter(x=>x.marks[s.id]&&x.marks[s.id]!=='A').length;
-  const tot=Math.max(att,new Set(S.filter(x=>x.group===s.g&&(!s.f||x.date>=s.f)).map(x=>x.date+x.type)).size);return{s,att,tot,p:tot?Math.round(att*100/tot):null}});
+  const own=new Set(S.filter(x=>x.group===s.g&&(!s.f||x.date>=s.f)).map(x=>x.date+x.type)).size,tot=Math.max(att,(T&&!s.f)?T:own);return{s,att,tot,p:tot?Math.round(att*100/tot):null}});
  rows.sort((a,b)=>(a.blk?1:0)-(b.blk?1:0)||(a.p??101)-(b.p??101));window._rows=rows;
  $('#sb').innerHTML=rows.map(r=>r.blk?`<tr><td>${esc(r.s.n)}</td><td>${esc(r.s.g)}</td><td>-</td><td>-</td><td class="pct">محجوب</td></tr>`:`<tr><td>${esc(r.s.n)}</td><td>${esc(r.s.g)}</td><td>${r.att}</td><td>${r.tot}</td><td class="pct ${r.p!==null&&r.p<75?'low':''}">${r.p===null?'-':r.p+'%'}</td></tr>`).join('')}
-$('#sm').onchange=$('#sg').onchange=stats;
+$('#sm').onchange=()=>{cfgFill();stats()};$('#sg').onchange=$('#stt').onchange=stats;
+$('#tsv').onclick=()=>{const mod=$('#sm').value;if(!mod)return;const r=Math.max(0,parseInt($('#tr').value)||0),l=Math.max(0,parseInt($('#tl').value)||0);
+ SET=SET.filter(x=>x.m!==mod).concat([{m:mod,r,l}]);FB.put('settings','modules',{list:SET});track();stats()};
 function dl(n,x,m){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([x],{type:m}));a.download=n;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000)}
 $('#csv').onclick=()=>dl('attendance-'+$('#sm').value+'.csv','\ufeffالطالب,المجموعة,حضر,من,نسبة\n'+(window._rows||[]).map(r=>[`"${r.s.n}"`,r.s.g,r.att,r.tot,r.blk?'محجوب':(r.p===null?'':r.p)].join(',')).join('\n'),'text/csv');
 $('#bx').onclick=()=>dl('attendance-backup-'+new Date().toISOString().slice(0,10)+'.json',JSON.stringify({sessions:allSessions(),extra:Object.values(R.extra)}),'application/json');
@@ -126,17 +149,29 @@ $('#ri').onclick=()=>$('#rf').click();
 $('#rf').onchange=async e=>{try{const j=JSON.parse(await e.target.files[0].text());let n=0;Object.entries(j).forEach(([g,a])=>{FB.put('roster',g,{students:a.map(s=>Object.assign({i:s[0],n:s[1]},s[2]?{b:1}:{}))});n+=a.length});alert('تم رفع قائمة '+n+' طالب')}catch(x){alert('الملف غير صالح')}e.target.value=''};
 $('#bi').onclick=()=>$('#bf').click();
 $('#bf').onchange=async e=>{try{const j=JSON.parse(await e.target.files[0].text());let n=0;Object.values(j.sessions||{}).forEach(s=>{const o=allSessions()[s.id];if(!o||(s.at||0)>(o.at||0)){FB.put('sessions',s.id,s);n++}});(j.extra||[]).forEach(s=>{if(!R.extra[s.id])FB.put('students',s.id,s)});alert('تم استيراد '+n+' تحضير')}catch(x){alert('الملف غير صالح')}e.target.value=''};
-function dayView(){const d=$('#dd').value,S=Object.values(allSessions()).filter(s=>s.date===d),by={};allStudents().forEach(s=>by[s.id]=s);let done=0,p=0,a=0;
- $('#dl').innerHTML=groups.map(g=>{const ss=S.filter(s=>s.group===g);if(!ss.length)return`<div class="card"><b>${g}</b> <span class="tag">لم يُسجَّل غياب</span></div>`;done++;
-  return`<div class="card"><b>${g}</b>`+ss.map(s=>{const m=Object.entries(s.marks),ab=m.filter(x=>x[1]==='A'),pr=m.length-ab.length;p+=pr;a+=ab.length;
-   return`<div style="margin-top:6px">${esc(s.module)} · ${esc(s.type)} · د. ${esc(s.doctor)}<br>حضر ${pr} · غاب ${ab.length}${ab.length?`<details><summary>الغائبون</summary>${ab.map(x=>esc(by[x[0]]?by[x[0]].n:x[0])).join('<br>')}</details>`:''}</div>`}).join('')+'</div>'}).join('');
- $('#dsum').textContent=`تم تسجيل ${done} من ${groups.length} مجموعة · حضور ${p} · غياب ${a}`;
+function dayData(d){d=d||$('#dd').value;const S=Object.values(allSessions()).filter(s=>s.date===d),all=allStudents(),att={},own={};
+ S.forEach(s=>{own[s.group]=1;Object.entries(s.marks).forEach(([i,v])=>{if(v!=='A')(att[i]=att[i]||[]).push(s)})});
+ return{att,rows:groups.map(g=>{const ss=all.filter(x=>x.g===g&&!x.b),pr=ss.filter(x=>att[x.id]),ab=ss.filter(x=>!att[x.id]);return{g,ss,pr,ab,rec:!!own[g]||pr.length>0}})}}
+function dayView(){const D=dayData(),att=D.att;let rec=0,p=0,a=0;
+ $('#dl').innerHTML=D.rows.map(x=>{if(!x.rec)return`<div class="card"><b>${esc(x.g)}</b> <span class="tag">لم يُسجَّل غياب</span></div>`;rec++;p+=x.pr.length;a+=x.ab.length;
+  return`<div class="card"><b>${esc(x.g)}</b> — حضر ${x.pr.length} من ${x.ss.length}`+
+   (x.pr.length?`<details><summary>الحاضرون (${x.pr.length})</summary>${x.pr.map(s=>`<div>${esc(s.n)} <small class="tag">${att[s.id].map(z=>(z.group===x.g?'':'مع '+esc(z.group)+' · ')+esc(z.module)+' '+esc(z.type)).join(' + ')}</small></div>`).join('')}</details>`:'')+
+   (x.ab.length?`<details><summary>لم يحضروا (${x.ab.length})</summary>${x.ab.map(s=>`<div>${esc(s.n)}</div>`).join('')}</details>`:'')+'</div>'}).join('');
+ $('#dsum').textContent=`مسجّل ${rec} من ${groups.length} مجموعة · حضر ${p} · لم يحضر ${a}`;
  $('#dsync').textContent=lastPull?'آخر تحديث: '+new Date(lastPull).toLocaleTimeString('ar-EG')+(navigator.onLine?'':' (أوفلاين)'):'بانتظار البيانات'}
 $('#dd').value=today();$('#dd').onchange=dayView;
-$('#dcsv').onclick=()=>{const d=$('#dd').value,by={};allStudents().forEach(s=>by[s.id]=s);const rows=[];
- Object.values(allSessions()).filter(s=>s.date===d).forEach(s=>Object.entries(s.marks).forEach(([i,v])=>rows.push([d,s.group,s.module,s.type,`"${s.doctor}"`,i,`"${by[i]?by[i].n:''}"`,by[i]?by[i].g:'',lab[v]].join(','))));
- dl('daily-'+d+'.csv','\ufeffالتاريخ,المجموعة,الموديول,النوع,الدكتور,الكود,الطالب,مجموعته الأصلية,الحالة\n'+rows.join('\n'),'text/csv')};
-function tab(t){document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));['take','log','stats','day'].forEach(x=>$('#'+x).classList.toggle('hide',x!==t));if(t==='log')logView();if(t==='day')dayView();if(t==='stats'){fillMods();stats()}}
+$('#dcsv').onclick=()=>{const d1=$('#dd').value,d2=$('#dd2').value||d1,f=$('#dflt').value,q=s=>'"'+String(s).replace(/"/g,'""')+'"';
+ if(!d1)return alert('اختار التاريخ');if(d2<d1)return alert('تاريخ النهاية قبل تاريخ البداية');
+ const days=[];for(let x=new Date(d1+'T00:00:00Z');x<=new Date(d2+'T00:00:00Z')&&days.length<=200;x=new Date(x.getTime()+864e5))days.push(x.toISOString().slice(0,10));
+ if(days.length>200)return alert('الفترة أطول من 200 يوم');
+ const byG={};
+ days.forEach(d=>{const D=dayData(d);D.rows.filter(x=>x.rec).forEach(x=>x.ss.forEach(s=>{const a=D.att[s.id],R=byG[x.g]=byG[x.g]||[];
+  if(a){if(f!=='a')a.forEach(z=>R.push([d,x.g,s.id,q(s.n),'حضر',z.group,z.module,z.type,q(z.doctor)].join(',')))}
+  else if(f!=='p')R.push([d,x.g,s.id,q(s.n),'لم يحضر','','','',''].join(','))}))});
+ const out=groups.flatMap(g=>byG[g]||[]);
+ if(!out.length)return alert('لا توجد بيانات لهذه الفترة بهذا الاختيار');
+ dl((d1===d2?'daily-'+d1:'attendance-'+d1+'_'+d2)+(f==='p'?'-present':f==='a'?'-absent':'')+'.csv','\ufeffالتاريخ,مجموعته,الكود,الطالب,الحالة,حضر مع,الموديول,النوع,الدكتور\n'+out.join('\n'),'text/csv')};
+function tab(t){document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));['take','log','stats','day'].forEach(x=>$('#'+x).classList.toggle('hide',x!==t));if(t==='log')logView();if(t==='day')dayView();if(t==='stats'){fillMods();cfgFill();stats()}}
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>tab(b.dataset.t));
 let admin=false,unsub=[];
 function status(){const n=Object.keys(R.pending).filter(k=>R.pending[k]).length;$('#sync').textContent=(navigator.onLine?'متصل':'أوفلاين')+(admin?(n?' · '+n+' لم يُرفع':' · الكل مرفوع'):(L.pend?' · في انتظار الرفع':' · الكل مرفوع'))}
@@ -145,6 +180,7 @@ function track(){L.pend=true;persist();status();FB.synced().then(()=>{L.pend=fal
 function dayRefresh(){fillMods();render();if(admin){if(!$('#day').classList.contains('hide'))dayView();if(!$('#log').classList.contains('hide'))logView()}status()}
 function applyRole(a){admin=a;$('nav').classList.toggle('hide',!a);if(!a)tab('take');unsub.forEach(f=>f&&f());unsub=[];
  if(a)unsub.push(FB.watch('sessions',(m,p)=>{R.sessions=m;R.pending=p;lastPull=Date.now();dayRefresh()}));
+ if(a)unsub.push(FB.watch('settings',m=>{SET=((m.modules||{}).list)||[];fillMods();cfgFill();if(!$('#stats').classList.contains('hide'))stats()}));
  unsub.push(FB.watch('students',m=>{R.extra=m;dayRefresh()}));
  unsub.push(FB.watch('roster',m=>{RO=m;ST=[];Object.entries(m).forEach(([g,d])=>(d.students||[]).forEach(s=>ST.push(Array.isArray(s)?[g,s[0],s[1]]:[g,s.i,s.n,s.b,s.f])));dayRefresh()}));status()}
 FB.onUser(async u=>{$('#login').classList.toggle('hide',!!u);unsub.forEach(f=>f&&f());unsub=[];
@@ -156,5 +192,5 @@ FB.onUser(async u=>{$('#login').classList.toggle('hide',!!u);unsub.forEach(f=>f&
 $('#lgo').onclick=async()=>{$('#lerr').textContent='';try{await FB.login($('#le').value.trim(),$('#lp').value)}catch(e){$('#lerr').textContent=navigator.onLine?'الإيميل أو كلمة المرور غير صحيحة':'محتاج إنترنت لأول دخول'}};
 $('#lout').onclick=()=>{if(confirm('تسجيل الخروج؟'))FB.logout()};
 window.addEventListener('offline',status);
-window.addEventListener('online',sync);if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});fillMods();render();status();
+window.addEventListener('online',sync);if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});fillMods();render();status();mineView();setInterval(mineView,60000);
 </script></body></html>
