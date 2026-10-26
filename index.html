@@ -31,7 +31,7 @@ button.sm{padding:7px 12px;border:1px solid var(--line);border-radius:8px;backgr
 .X{background:var(--line);color:var(--mut);font-size:12px;min-width:0}.row.blk{cursor:default;opacity:.8}
 </style></head><body>
 <div id="login" style="position:fixed;inset:0;background:var(--bg);z-index:50;padding:24px;overflow:auto"><div class="card" style="max-width:380px;margin:12vh auto 0"><h2 style="margin-top:0">تسجيل الدخول</h2><label>الإيميل</label><input id="le" type="email" autocomplete="username" dir="ltr"><label style="margin-top:8px">كلمة المرور</label><input id="lp" type="password" autocomplete="current-password" dir="ltr"><div id="lerr" class="tag" style="margin-top:6px"></div><button class="pri" id="lgo">دخول</button><small style="color:var(--mut)">أول دخول يحتاج إنترنت، وبعدها يفضل الحساب شغال أوفلاين.</small></div></div>
-<header><b>غياب الفرقة الرابعة</b><span><span id="sync"></span> <button class="sm" id="lout" style="padding:3px 8px">خروج</button></span></header>
+<header><b>غياب الفرقة الرابعة</b> <small id="ver" style="opacity:.55;font-size:10px"></small><span><span id="sync"></span> <button class="sm" id="lout" style="padding:3px 8px">خروج</button></span></header>
 <nav><button data-t="take" class="on">تحضير</button><button data-t="log">السجل</button><button data-t="day">اليوم</button><button data-t="stats">الإحصائيات</button></nav>
 <main>
 <section id="take">
@@ -192,5 +192,15 @@ FB.onUser(async u=>{$('#login').classList.toggle('hide',!!u);unsub.forEach(f=>f&
 $('#lgo').onclick=async()=>{$('#lerr').textContent='';try{await FB.login($('#le').value.trim(),$('#lp').value)}catch(e){$('#lerr').textContent=navigator.onLine?'الإيميل أو كلمة المرور غير صحيحة':'محتاج إنترنت لأول دخول'}};
 $('#lout').onclick=()=>{if(confirm('تسجيل الخروج؟'))FB.logout()};
 window.addEventListener('offline',status);
-window.addEventListener('online',sync);if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});fillMods();render();status();mineView();setInterval(mineView,60000);
+window.addEventListener('online',sync);if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{});
+const BUILD='2026-10-27a';$('#ver').textContent='v'+BUILD;
+async function goUpd(){try{if(window.caches){const ks=await caches.keys();await Promise.all(ks.map(x=>caches.delete(x)))}}catch(e){}location.reload()}
+function updBan(){if($('#upd'))return;const d=document.createElement('div');d.id='upd';d.style.cssText='position:fixed;bottom:0;left:0;right:0;background:var(--pri);color:var(--priInk);padding:14px;text-align:center;z-index:40;font-weight:700';d.textContent='في نسخة جديدة من البرنامج - احفظ شغلك واضغط هنا للتحديث';d.onclick=goUpd;document.body.appendChild(d)}
+let updBusy=false;
+async function chkUpd(){if(updBusy||!navigator.onLine)return;updBusy=true;try{const t=await(await fetch('index.html',{cache:'no-store'})).text();const m=t.match(/BUILD='(\d[^']*)'/);
+ if(m&&m[1]!==BUILD){const busy=cur&&(cur.orig||Object.keys(cur.marks).length);
+  if(busy)updBan();else{let last=0;try{last=+sessionStorage.getItem('att_rl')||0}catch(e){}
+   if(Date.now()-last>60000){try{sessionStorage.setItem('att_rl',String(Date.now()))}catch(e){}await goUpd();return}else updBan()}}}catch(e){}updBusy=false}
+setTimeout(chkUpd,2500);setInterval(chkUpd,300000);window.addEventListener('online',chkUpd);document.addEventListener('visibilitychange',()=>{if(!document.hidden)chkUpd()});
+fillMods();render();status();mineView();setInterval(mineView,60000);
 </script></body></html>
