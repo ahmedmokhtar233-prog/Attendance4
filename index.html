@@ -40,7 +40,7 @@ button.sm{padding:7px 12px;border:1px solid var(--line);border-radius:8px;backgr
   <div><label>اسم الدكتور</label><input id="doc" placeholder="الاسم"></div>
   <div><label>موديول آخر (اختياري)</label><input id="mod" placeholder="اكتب الاسم"></div>
   <div><label>النوع</label><select id="typ"><option>راوند</option><option>محاضرة</option></select></div>
-  <div><label>التاريخ</label><input id="dt" type="date"></div>
+  <div><label>التاريخ</label><input id="dt" type="date"><div id="dwarn" class="hide" style="margin-top:6px;padding:8px;border-radius:8px;background:var(--late);color:#fff;font-size:13px"><b>⚠ مش تاريخ النهارده</b><br><span></span><br><button class="sm" id="dtoday" type="button" style="margin-top:6px">خليه النهارده</button></div></div>
  </div><div style="margin-top:10px"><label>الموديول (اضغط للاختيار)</label><div id="chips" class="chips"></div></div><div style="margin-top:10px"><label>المجموعة</label><select id="grp"></select></div></div>
  <div class="card"><div id="list"></div></div>
  <div class="card"><label>طالب من مجموعة تانية حضر معاك</label><input id="q" placeholder="ابحث بالاسم أو الكود"><div id="res" class="res"></div>
@@ -69,6 +69,9 @@ try{L=Object.assign(L,JSON.parse(localStorage.getItem(LS)||'{}'))}catch(e){}
 L.mine=L.mine||{};
 const persist=()=>{try{localStorage.setItem(LS,JSON.stringify(L))}catch(e){}};
 const today=()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)};
+let dateTouched=false,dtDay='';
+function dwarn(){const e=$('#dwarn');if(!e)return;const t=today(),v=$('#dt').value,show=!(cur&&cur.orig)&&v&&v!==t;e.classList.toggle('hide',!show);if(show)e.querySelector('span').textContent='التاريخ المكتوب '+v+' والنهارده '+t}
+function refreshDate(){if(cur&&cur.orig)return;if(!(dateTouched&&dtDay===today())){dateTouched=false;$('#dt').value=today()}dwarn()}
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const allStudents=()=>{const m={};ST.forEach(s=>m[s[1]]={id:s[1],g:s[0],n:s[2],b:s[3],f:s[4]});[...L.extra,...Object.values(R.extra)].forEach(s=>m[s.id]=s);return Object.values(m)};
 const allSessions=()=>{const m=Object.assign({},R.sessions,L.sessions);(L.del||[]).forEach(i=>delete m[i]);return m};
@@ -78,7 +81,7 @@ function setGroups(){const gs=[...new Set(allStudents().map(s=>s.g))].sort((a,b)
  if(gs.join('|')===groups.join('|'))return;const c=$('#grp').value;groups=gs;$('#grp').innerHTML=groups.map(g=>`<option>${esc(g)}</option>`).join('');if(groups.includes(c))$('#grp').value=c}
 const lab={P:'حاضر',A:'غايب',L:'متأخر'},nxt={P:'A',A:'L',L:'P'};
 $('#dt').value=today();$('#doc').value=L.doctor||'';
-function newSession(){cur={id:(crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random()),marks:{},extra:[]};}
+function newSession(){cur={id:(crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random()),marks:{},extra:[]};refreshDate()}
 newSession();
 function render(){
  const g=$('#grp').value,ss=allStudents().filter(s=>s.g===g),act=ss.filter(s=>!s.b),blk=ss.filter(s=>s.b);
@@ -100,12 +103,13 @@ const WIN=3*3600*1000;
 function lockEdit(on){$('#cedit').classList.toggle('hide',!on);$('#grp').disabled=on;
  ['#doc','#mod','#typ','#dt'].forEach(k=>$(k).disabled=on&&!admin);$('#chips').style.pointerEvents=(on&&!admin)?'none':''}
 function openEdit(s){cur={id:s.id,marks:Object.assign({},s.marks),extra:Object.keys(s.marks).filter(i=>!allStudents().find(x=>String(x.id)===String(i)&&x.g===s.group)),orig:s};
- $('#doc').value=s.doctor;$('#mod').value=s.module;chips();$('#typ').value=s.type;$('#dt').value=s.date;$('#grp').value=s.group;tab('take');lockEdit(true);render()}
+ $('#doc').value=s.doctor;$('#mod').value=s.module;chips();$('#typ').value=s.type;$('#dt').value=s.date;$('#grp').value=s.group;tab('take');lockEdit(true);dwarn();render()}
 $('#cedit').onclick=()=>{newSession();lockEdit(false);render()};
 $('#save').onclick=()=>{const doc=$('#doc').value.trim(),mod=$('#mod').value.trim();if(!doc||!mod)return alert('اكتب اسم الدكتور والموديول');
  const o=cur.orig,now=Date.now();
  if(o&&!admin&&now-o.at>=WIN){alert('انتهت مدة التعديل (3 ساعات). اطلب من المدير تعديل التحضير.');newSession();lockEdit(false);render();mineView();return}
  const g=$('#grp').value,marks={};
+ if(!o&&$('#dt').value!==today()&&!confirm('التاريخ المكتوب '+$('#dt').value+' مش تاريخ النهارده ('+today()+').\nمتأكد إنك عايز تسجل بالتاريخ ده؟\n\nOK = سجّل بالتاريخ ده\nCancel = رجوع وأصلّحه'))return;
  if(!o){const k=dupKey({group:g,date:$('#dt').value,module:mod,type:$('#typ').value}),d=Object.values(Object.assign({},L.mine,allSessions())).find(x=>x.id!==cur.id&&dupKey(x)===k);
   if(d&&!confirm('في تحضير محفوظ بالفعل لنفس المجموعة والموديول والنوع والتاريخ (د. '+d.doctor+').\nلو بتكمّله أو بتصححه، الأفضل تعدّل التحضير الأول بدل ما تسجّل واحد جديد.\n\nOK = احفظ تحضير جديد برضه\nCancel = رجوع'))return}
  allStudents().filter(s=>s.g===g&&!s.b).forEach(s=>marks[s.id]=cur.marks[s.id]||'P');cur.extra.forEach(i=>marks[i]=cur.marks[i]);
@@ -210,7 +214,7 @@ $('#lgo').onclick=async()=>{$('#lerr').textContent='';try{await FB.login($('#le'
 $('#lout').onclick=()=>{if(confirm('تسجيل الخروج؟'))FB.logout()};
 window.addEventListener('offline',status);
 window.addEventListener('online',sync);if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{});
-const BUILD='2026-11-09b';$('#ver').textContent='v'+BUILD;
+const BUILD='2026-11-09c';$('#ver').textContent='v'+BUILD;
 async function goUpd(){try{if(window.caches){const ks=await caches.keys();await Promise.all(ks.map(x=>caches.delete(x)))}}catch(e){}location.reload()}
 function updBan(){if($('#upd'))return;const d=document.createElement('div');d.id='upd';d.style.cssText='position:fixed;bottom:0;left:0;right:0;background:var(--pri);color:var(--priInk);padding:14px;text-align:center;z-index:40;font-weight:700';d.textContent='في نسخة جديدة من البرنامج - احفظ شغلك واضغط هنا للتحديث';d.onclick=goUpd;document.body.appendChild(d)}
 let updBusy=false;
@@ -218,6 +222,8 @@ async function chkUpd(){if(updBusy||!navigator.onLine)return;updBusy=true;try{co
  if(m&&m[1]!==BUILD){const busy=cur&&(cur.orig||Object.keys(cur.marks).length);
   if(busy)updBan();else{let last=0;try{last=+sessionStorage.getItem('att_rl')||0}catch(e){}
    if(Date.now()-last>60000){try{sessionStorage.setItem('att_rl',String(Date.now()))}catch(e){}await goUpd();return}else updBan()}}}catch(e){}updBusy=false}
+$('#dt').onchange=$('#dt').oninput=()=>{dateTouched=true;dtDay=today();dwarn()};$('#dtoday').onclick=()=>{dateTouched=false;$('#dt').value=today();dwarn()};
+setInterval(refreshDate,60000);window.addEventListener('focus',refreshDate);window.addEventListener('pageshow',refreshDate);document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshDate()});
 setTimeout(chkUpd,2500);setInterval(chkUpd,300000);window.addEventListener('online',chkUpd);document.addEventListener('visibilitychange',()=>{if(!document.hidden)chkUpd()});
 fillMods();render();status();mineView();setInterval(mineView,60000);
 </script></body></html>
