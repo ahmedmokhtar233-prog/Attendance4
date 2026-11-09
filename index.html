@@ -104,7 +104,10 @@ $('#cedit').onclick=()=>{newSession();lockEdit(false);render()};
 $('#save').onclick=()=>{const doc=$('#doc').value.trim(),mod=$('#mod').value.trim();if(!doc||!mod)return alert('اكتب اسم الدكتور والموديول');
  const o=cur.orig,now=Date.now();
  if(o&&!admin&&now-o.at>=WIN){alert('انتهت مدة التعديل (3 ساعات). اطلب من المدير تعديل التحضير.');newSession();lockEdit(false);render();mineView();return}
- const g=$('#grp').value,marks={};allStudents().filter(s=>s.g===g&&!s.b).forEach(s=>marks[s.id]=cur.marks[s.id]||'P');cur.extra.forEach(i=>marks[i]=cur.marks[i]);
+ const g=$('#grp').value,marks={};
+ if(!o){const k=dupKey({group:g,date:$('#dt').value,module:mod,type:$('#typ').value}),d=Object.values(Object.assign({},L.mine,allSessions())).find(x=>x.id!==cur.id&&dupKey(x)===k);
+  if(d&&!confirm('في تحضير محفوظ بالفعل لنفس المجموعة والموديول والنوع والتاريخ (د. '+d.doctor+').\nلو بتكمّله أو بتصححه، الأفضل تعدّل التحضير الأول بدل ما تسجّل واحد جديد.\n\nOK = احفظ تحضير جديد برضه\nCancel = رجوع'))return}
+ allStudents().filter(s=>s.g===g&&!s.b).forEach(s=>marks[s.id]=cur.marks[s.id]||'P');cur.extra.forEach(i=>marks[i]=cur.marks[i]);
  const f={doctor:doc,module:mod,type:$('#typ').value,date:$('#dt').value,group:g,marks};
  const ses=o?Object.assign({},o,f,{upd:now}):Object.assign({id:cur.id,by:FB.email(),at:now},f);
  L.doctor=doc;if(ses.by===FB.email())L.mine[ses.id]=ses;persist();FB.put('sessions',ses.id,ses);track();
@@ -125,8 +128,9 @@ function blkView(){const a=allStudents().filter(s=>s.b);$('#blk').innerHTML=a.le
 $('#blk').onclick=e=>{const b=e.target.closest('[data-u]');if(!b)return;const id=b.dataset.u,s=allStudents().find(x=>String(x.id)===id);if(!s)return;
  const d=prompt('فك الحجب عن '+s.n+'\nتاريخ بداية احتساب الغياب (سنة-شهر-يوم):',today());if(!d)return;if(!/^\d{4}-\d{2}-\d{2}$/.test(d.trim()))return alert('اكتب التاريخ بالشكل 2026-11-01');
  const arr=((RO[s.g]||{}).students||[]).map(x=>String(x.i)===id?{i:x.i,n:x.n,f:d.trim()}:x);FB.put('roster',s.g,{students:arr});track()};
-function logView(){blkView();const a=Object.values(allSessions()).sort((x,y)=>(y.date||'').localeCompare(x.date||'')||y.at-x.at);
- $('#logl').innerHTML=a.map(s=>{const p=Object.values(s.marks).filter(x=>x!=='A').length;return`<div class="card"><b>${esc(s.module)}</b> · ${esc(s.type)} · ${s.group}<br><small>${s.date} — د. ${esc(s.doctor)} — حضر ${p} من ${Object.keys(s.marks).length}${R.pending[s.id]?' <span class="tag">لم يُرفع</span>':''}</small><div style="margin-top:6px;display:flex;gap:8px"><button class="sm" data-e="${s.id}">تعديل</button><button class="sm" data-d="${s.id}" style="color:var(--bad)">حذف</button></div></div>`}).join('')||'<div class="card">لا توجد تحضيرات بعد</div>'}
+function dupKey(s){return[s.group,s.date,String(s.module||'').trim(),s.type].join('|')}
+function logView(){blkView();const a=Object.values(allSessions()).sort((x,y)=>(y.date||'').localeCompare(x.date||'')||y.at-x.at),dk={};a.forEach(s=>{const k=dupKey(s);dk[k]=(dk[k]||0)+1});
+ $('#logl').innerHTML=a.map(s=>{const p=Object.values(s.marks).filter(x=>x!=='A').length;return`<div class="card"><b>${esc(s.module)}</b> · ${esc(s.type)} · ${s.group}<br><small>${s.date} — د. ${esc(s.doctor)} — حضر ${p} من ${Object.keys(s.marks).length}${R.pending[s.id]?' <span class="tag">لم يُرفع</span>':''}${dk[dupKey(s)]>1?' <span class="tag" style="background:var(--late);color:#fff">مكرر</span>':''}</small><div style="margin-top:6px;display:flex;gap:8px"><button class="sm" data-e="${s.id}">تعديل</button><button class="sm" data-d="${s.id}" style="color:var(--bad)">حذف</button></div></div>`}).join('')||'<div class="card">لا توجد تحضيرات بعد</div>'}
 $('#logl').onclick=e=>{const x=e.target.closest('[data-d]');if(x){const id=x.dataset.d,s=allSessions()[id];if(!s||!confirm('حذف تحضير '+s.module+' - '+s.group+' بتاريخ '+s.date+'؟'))return;
  FB.del('sessions',id);delete R.sessions[id];if(cur.id===id)newSession();logView();render();return}
  const b=e.target.closest('[data-e]');if(!b)return;const s=allSessions()[b.dataset.e];if(s)openEdit(s)};
@@ -135,7 +139,7 @@ function stats(){const mod=$('#sm').value,g=$('#sg').value,ty=$('#stt').value,cf
  want=ty==='r'?['راوند']:ty==='l'?['محاضرة']:['راوند','محاضرة'],S=Object.values(allSessions()).filter(s=>s.module===mod&&want.includes(s.type)),
  T=ty==='r'?cfg.r:ty==='l'?cfg.l:(cfg.r&&cfg.l?cfg.r+cfg.l:0);
  $('#thint').textContent=T?'':'لم تُحدَّد إجمالي الجلسات لهذا الموديول، فالنسبة مؤقتة ومحسوبة من الجلسات المسجلة لمجموعة كل طالب (قد تكون غير دقيقة مع تجميع المجموعات).';
- const rows=allStudents().filter(s=>!g||s.g===g).map(s=>{if(s.b)return{s,att:0,tot:0,p:null,blk:true};const att=S.filter(x=>x.marks[s.id]&&x.marks[s.id]!=='A').length;
+ const rows=allStudents().filter(s=>!g||s.g===g).map(s=>{if(s.b)return{s,att:0,tot:0,p:null,blk:true};const att=new Set(S.filter(x=>x.marks[s.id]&&x.marks[s.id]!=='A').map(x=>x.date+'|'+x.type)).size;
   const own=new Set(S.filter(x=>x.group===s.g&&(!s.f||x.date>=s.f)).map(x=>x.date+x.type)).size,tot=Math.max(att,(T&&!s.f)?T:own);return{s,att,tot,p:tot?Math.round(att*100/tot):null}});
  rows.sort((a,b)=>(a.blk?1:0)-(b.blk?1:0)||(a.p??101)-(b.p??101));window._rows=rows;
  $('#sb').innerHTML=rows.map(r=>r.blk?`<tr><td>${esc(r.s.n)}</td><td>${esc(r.s.g)}</td><td>-</td><td>-</td><td class="pct">محجوب</td></tr>`:`<tr><td>${esc(r.s.n)}</td><td>${esc(r.s.g)}</td><td>${r.att}</td><td>${r.tot}</td><td class="pct ${r.p!==null&&r.p<75?'low':''}">${r.p===null?'-':r.p+'%'}</td></tr>`).join('')}
@@ -193,7 +197,7 @@ $('#lgo').onclick=async()=>{$('#lerr').textContent='';try{await FB.login($('#le'
 $('#lout').onclick=()=>{if(confirm('تسجيل الخروج؟'))FB.logout()};
 window.addEventListener('offline',status);
 window.addEventListener('online',sync);if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{});
-const BUILD='2026-10-27a';$('#ver').textContent='v'+BUILD;
+const BUILD='2026-11-09a';$('#ver').textContent='v'+BUILD;
 async function goUpd(){try{if(window.caches){const ks=await caches.keys();await Promise.all(ks.map(x=>caches.delete(x)))}}catch(e){}location.reload()}
 function updBan(){if($('#upd'))return;const d=document.createElement('div');d.id='upd';d.style.cssText='position:fixed;bottom:0;left:0;right:0;background:var(--pri);color:var(--priInk);padding:14px;text-align:center;z-index:40;font-weight:700';d.textContent='في نسخة جديدة من البرنامج - احفظ شغلك واضغط هنا للتحديث';d.onclick=goUpd;document.body.appendChild(d)}
 let updBusy=false;
